@@ -9,20 +9,20 @@ using namespace std;
 
 static const char *TAG = "BS";
 
-const int ANALOG_READ_PIN = 36; // or A0
+const int READ_PIN = 34; // or A0
+const int LED_PIN = 26;
 const int RESOLUTION = 12; // Could be 9-12
 
-const int THRESHOLD = 1000; //TODO: avaliar limite
+const int THRESHOLD = 1000;
 
 // AP credentials
-const char *ssid = "BASESTATION";
-const char *password = "redes-renato";
-const char *serverName = "http://192.168.4.1/monitor"; // TODO: mudar IP?
+const char *ssid = "redes-renato";
+const char *password = "12345678";
+const char *serverName = "http://192.168.4.1/monitor";
 
 AsyncWebServer server(80);
 
 
-///////////////// SETUPS /////////////////
 void baseStationSetup() {
   WiFi.softAP(ssid, password);
   Serial.println(WiFi.macAddress());
@@ -34,8 +34,9 @@ void baseStationSetup() {
   server.on("/monitor", HTTP_POST, [](AsyncWebServerRequest *request) {
     AsyncWebParameter *p = request->getParam("light", true);
     String light = p->value();
+    Serial.println(light);
 
-    if (light.toInt() > THRESHOLD) {
+    if (light.toInt() < THRESHOLD) {
       request->send_P(200, "text/plain", "off");
     }
     else {
@@ -59,62 +60,74 @@ void poleSetup() {
   Serial.println("");
   Serial.print("Connected to WiFi network with IP Address: ");
   Serial.println(WiFi.localIP());
+
+  digitalWrite(LED_PIN, HIGH);
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
+  delay(1000);
+  digitalWrite(LED_PIN, HIGH);
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
 }
-///////////////// SETUPS /////////////////
 
 
 int getLight() {
   analogReadResolution(RESOLUTION);
   
-  return analogRead(ANALOG_READ_PIN);
+  int light = analogRead(READ_PIN);
+  Serial.println("light: " + String(light));
+  return light;
 }
 
 
-///////////////// TASKS /////////////////
-void sendPoleRequests(void *param) {
-  esp_task_wdt_init(10, false);
+void baseStationLoop() {
+  Serial.println(WiFi.macAddress());
 
-  while (true) {
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+  delay(5000);
+}
+
+void poleLoop() {
+  hile (true) {
     WiFiClient client;
     HTTPClient http;
 
     http.begin(client, serverName);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
     // Send HTTP POST request
-    int httpResponseCode = http.POST(static_cast<String>(getLight()));
+    Serial.println("Sending POST request");
+    int httpResponseCode = http.POST("light=" + String(getLight()));
+    Serial.println(httpResponseCode);
+    String payload = http.getString();
+    Serial.println(payload);
 
-    if (httpResponseCode == HTTP_CODE_OK) {
-      String payload = http.getString();
-      
-      if (payload == "on") {
-        // TODO: set LED on
-      }
-      else if (payload == "off") {
-        // TODO: set LED off
-      }
+    if (payload == "on") {
+      digitalWrite(LED_PIN, HIGH);
+    } else {
+      digitalWrite(LED_PIN, LOW);
     }
+
 
     // Free resources
     http.end();
+    delay(3000);
   }
-}
-///////////////// TASKS /////////////////
-
-
-///////////////// LOOPS /////////////////
-void baseStationLoop() {}
-
-void poleLoop() {
-  xTaskCreate(sendPoleRequests, "send requests", 8192, NULL, 1, NULL);
 
 }
 ///////////////// LOOPS /////////////////
 
 void setup() {
-  Serial.begin(115200);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(READ_PIN, INPUT);
+  Serial.begin(9600);
+  delay(2000);
 
   // Setup
   if (strcmp(TAG, "BS") == 0) {
+    Serial.println("setup base");
     baseStationSetup();
   } else {
     poleSetup();
@@ -123,8 +136,10 @@ void setup() {
 
 void loop() {
   if (strcmp(TAG, "BS") == 0) {
+    Serial.println("loop base");
     baseStationLoop();
   } else {
+    Serial.println("loop pole");
     poleLoop();
   }
 }
