@@ -7,13 +7,13 @@
 
 using namespace std;
 
-static const char *TAG = "BS";
+static const char *TAG = "POSTE";
 
-const int READ_PIN = 34; // or A0
-const int LED_PIN = 26;
-const int RESOLUTION = 12; // Could be 9-12
+const int READ_PIN = 34;
+const int LED_PIN = 16;
+const int RESOLUTION = 12; 
 
-const int THRESHOLD = 1000;
+const int THRESHOLD = 2000;
 
 // AP credentials
 const char *ssid = "redes-renato";
@@ -90,7 +90,7 @@ void baseStationLoop() {
 }
 
 void poleLoop() {
-  hile (true) {
+  while (true) {
     WiFiClient client;
     HTTPClient http;
 
@@ -113,11 +113,10 @@ void poleLoop() {
 
     // Free resources
     http.end();
-    delay(3000);
+    delay(500);
   }
 
 }
-///////////////// LOOPS /////////////////
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
@@ -125,11 +124,11 @@ void setup() {
   Serial.begin(9600);
   delay(2000);
 
-  // Setup
   if (strcmp(TAG, "BS") == 0) {
     Serial.println("setup base");
     baseStationSetup();
   } else {
+    Serial.println("setup pole");
     poleSetup();
   }
 }
